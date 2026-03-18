@@ -1,0 +1,1049 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>eBPF SSL/TLS Sniffer — API Discovery Demo</title>
+<style>
+  :root {
+    --bg: #0a0e1a;
+    --surface: #111827;
+    --surface2: #1a2234;
+    --border: #1e293b;
+    --text: #e2e8f0;
+    --text-muted: #94a3b8;
+    --accent: #3b82f6;
+    --accent2: #8b5cf6;
+    --green: #22c55e;
+    --red: #ef4444;
+    --orange: #f59e0b;
+    --cyan: #06b6d4;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.7; }
+
+  /* Navigation */
+  nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; background: rgba(10,14,26,0.92); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); padding: 0 2rem; }
+  nav .inner { max-width: 1200px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; height: 56px; }
+  nav .logo { font-weight: 700; font-size: 1rem; color: var(--accent); display: flex; align-items: center; gap: 8px; }
+  nav .logo svg { width: 20px; height: 20px; }
+  nav .links { display: flex; gap: 1.5rem; }
+  nav .links a { color: var(--text-muted); text-decoration: none; font-size: 0.85rem; font-weight: 500; transition: color 0.2s; }
+  nav .links a:hover { color: var(--text); }
+
+  /* Hero */
+  .hero { padding: 8rem 2rem 4rem; text-align: center; background: radial-gradient(ellipse at 50% 0%, rgba(59,130,246,0.08) 0%, transparent 60%); }
+  .hero h1 { font-size: 3rem; font-weight: 800; letter-spacing: -0.03em; background: linear-gradient(135deg, #60a5fa, #a78bfa, #f472b6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 1rem; }
+  .hero .subtitle { font-size: 1.25rem; color: var(--text-muted); max-width: 700px; margin: 0 auto 2rem; }
+  .hero .badges { display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap; }
+  .badge { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 20px; font-size: 0.78rem; font-weight: 600; border: 1px solid var(--border); background: var(--surface); }
+  .badge.green { border-color: #166534; color: var(--green); }
+  .badge.blue { border-color: #1e3a5f; color: var(--accent); }
+  .badge.purple { border-color: #4c1d95; color: var(--accent2); }
+  .badge .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+  /* Sections */
+  section { max-width: 1200px; margin: 0 auto; padding: 4rem 2rem; }
+  .section-label { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--accent); margin-bottom: 0.5rem; }
+  h2 { font-size: 2rem; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 1.5rem; }
+  h3 { font-size: 1.25rem; font-weight: 600; margin-bottom: 0.75rem; color: var(--text); }
+  p { color: var(--text-muted); margin-bottom: 1rem; }
+
+  /* Cards */
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; margin-top: 1.5rem; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; transition: border-color 0.2s, transform 0.2s; }
+  .card:hover { border-color: #334155; transform: translateY(-2px); }
+  .card .icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; margin-bottom: 1rem; }
+  .card .icon.blue { background: rgba(59,130,246,0.12); color: var(--accent); }
+  .card .icon.purple { background: rgba(139,92,246,0.12); color: var(--accent2); }
+  .card .icon.green { background: rgba(34,197,94,0.12); color: var(--green); }
+  .card .icon.cyan { background: rgba(6,182,212,0.12); color: var(--cyan); }
+  .card .icon.orange { background: rgba(245,158,11,0.12); color: var(--orange); }
+  .card .icon.red { background: rgba(239,68,68,0.12); color: var(--red); }
+  .card h3 { font-size: 1.05rem; }
+  .card p { font-size: 0.9rem; }
+
+  /* Architecture Diagram */
+  .arch { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 2.5rem; margin: 2rem 0; overflow-x: auto; }
+  .arch-flow { display: flex; align-items: center; justify-content: center; gap: 0; flex-wrap: nowrap; min-width: 900px; }
+  .arch-node { text-align: center; padding: 1rem 1.25rem; border-radius: 10px; border: 1px solid var(--border); background: var(--surface2); min-width: 130px; }
+  .arch-node.highlight { border-color: var(--accent); box-shadow: 0 0 20px rgba(59,130,246,0.15); }
+  .arch-node .label { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+  .arch-node .name { font-weight: 700; font-size: 0.95rem; }
+  .arch-node .detail { font-size: 0.72rem; color: var(--text-muted); margin-top: 4px; }
+  .arch-arrow { color: var(--text-muted); font-size: 1.5rem; padding: 0 0.5rem; flex-shrink: 0; }
+  .arch-arrow.glow { color: var(--accent); text-shadow: 0 0 10px rgba(59,130,246,0.5); }
+
+  /* WOW Highlights */
+  .wow { background: linear-gradient(135deg, rgba(59,130,246,0.06), rgba(139,92,246,0.06)); border: 1px solid rgba(99,102,241,0.2); border-radius: 12px; padding: 1.75rem; margin: 1.5rem 0; position: relative; overflow: hidden; }
+  .wow::before { content: ''; position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: linear-gradient(180deg, var(--accent), var(--accent2)); }
+  .wow .wow-tag { display: inline-block; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.12em; color: var(--accent); background: rgba(59,130,246,0.1); padding: 3px 10px; border-radius: 4px; margin-bottom: 0.75rem; }
+  .wow h3 { color: var(--text); margin-bottom: 0.5rem; }
+  .wow p { color: var(--text-muted); margin: 0; font-size: 0.92rem; }
+
+  /* Code blocks */
+  pre { background: #0d1117; border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 0.82rem; line-height: 1.8; overflow-x: auto; color: #c9d1d9; margin: 1rem 0; }
+  code { font-family: 'JetBrains Mono', 'Fira Code', monospace; }
+  .code-comment { color: #8b949e; }
+  .code-keyword { color: #ff7b72; }
+  .code-string { color: #a5d6ff; }
+  .code-func { color: #d2a8ff; }
+  .code-number { color: #79c0ff; }
+
+  /* Comparison Table */
+  .table-wrap { overflow-x: auto; margin: 1.5rem 0; border-radius: 12px; border: 1px solid var(--border); }
+  table { width: 100%; border-collapse: collapse; background: var(--surface); }
+  th { text-align: left; padding: 0.85rem 1rem; font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); background: var(--surface2); border-bottom: 1px solid var(--border); }
+  td { padding: 0.85rem 1rem; font-size: 0.88rem; border-bottom: 1px solid var(--border); color: var(--text-muted); }
+  tr:last-child td { border-bottom: none; }
+  td:first-child { font-weight: 600; color: var(--text); }
+  .yes { color: var(--green); font-weight: 600; }
+  .no { color: #64748b; }
+  .partial { color: var(--orange); }
+  .highlight-row { background: rgba(59,130,246,0.05); }
+  .highlight-row td:first-child { color: var(--accent); }
+
+  /* Stats */
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin: 2rem 0; }
+  .stat { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; text-align: center; }
+  .stat .value { font-size: 2.25rem; font-weight: 800; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .stat .label { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem; }
+
+  /* DVP Section */
+  .dvp-services { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.75rem; margin: 1.5rem 0; }
+  .dvp-svc { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 0.75rem 1rem; text-align: center; font-size: 0.82rem; }
+  .dvp-svc .port { font-size: 0.7rem; color: var(--text-muted); }
+  .dvp-svc.vuln { border-color: rgba(239,68,68,0.3); }
+  .dvp-svc .vuln-tag { font-size: 0.6rem; color: var(--red); font-weight: 700; display: block; margin-top: 2px; }
+
+  /* Timeline */
+  .timeline { margin: 2rem 0; }
+  .timeline-item { display: flex; gap: 1.25rem; padding-bottom: 1.5rem; position: relative; }
+  .timeline-item::before { content: ''; position: absolute; left: 15px; top: 36px; bottom: 0; width: 2px; background: var(--border); }
+  .timeline-item:last-child::before { display: none; }
+  .timeline-dot { width: 32px; height: 32px; border-radius: 50%; background: var(--surface2); border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 0.85rem; flex-shrink: 0; z-index: 1; }
+  .timeline-dot.active { border-color: var(--accent); background: rgba(59,130,246,0.1); }
+  .timeline-content { flex: 1; }
+  .timeline-content h4 { font-size: 0.95rem; font-weight: 600; margin-bottom: 0.25rem; }
+  .timeline-content p { font-size: 0.85rem; color: var(--text-muted); margin: 0; }
+
+  /* Vuln categories */
+  .vuln-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin: 1.5rem 0; }
+  .vuln-item { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem; }
+  .vuln-item .tag { display: inline-block; font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; padding: 2px 8px; border-radius: 4px; margin-bottom: 0.5rem; }
+  .vuln-item .tag.critical { background: rgba(239,68,68,0.15); color: var(--red); }
+  .vuln-item .tag.high { background: rgba(245,158,11,0.15); color: var(--orange); }
+  .vuln-item .tag.medium { background: rgba(139,92,246,0.15); color: var(--accent2); }
+
+  /* Footer */
+  footer { text-align: center; padding: 3rem 2rem; color: var(--text-muted); font-size: 0.8rem; border-top: 1px solid var(--border); margin-top: 2rem; }
+
+  /* Separator */
+  .sep { border: none; border-top: 1px solid var(--border); margin: 3rem 0; }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .hero h1 { font-size: 2rem; }
+    .arch-flow { flex-direction: column; min-width: auto; }
+    .arch-arrow { transform: rotate(90deg); }
+    section { padding: 2rem 1rem; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="inner">
+    <div class="logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+      Invicti API Security
+    </div>
+    <div class="links">
+      <a href="#overview">Overview</a>
+      <a href="#architecture">Architecture</a>
+      <a href="#dvp">DVP</a>
+      <a href="#ebpf">eBPF Sniffer</a>
+      <a href="#reconstructor">Reconstructor</a>
+      <a href="#comparison">Comparison</a>
+      <a href="#faq">FAQ</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ============================================================ -->
+<!-- HERO -->
+<!-- ============================================================ -->
+<div class="hero">
+  <h1>eBPF-Powered API Discovery</h1>
+  <p class="subtitle">Kernel-level SSL/TLS interception for automatic API discovery. Zero code changes. Zero sidecars. Full visibility into every API call across your infrastructure.</p>
+  <div class="badges">
+    <span class="badge green"><span class="dot"></span> Kernel-Level Capture</span>
+    <span class="badge blue"><span class="dot"></span> TLS Decryption Without Termination</span>
+    <span class="badge purple"><span class="dot"></span> Automatic OpenAPI Spec Generation</span>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- OVERVIEW -->
+<!-- ============================================================ -->
+<section id="overview">
+  <div class="section-label">The Problem</div>
+  <h2>You Can't Secure What You Can't See</h2>
+  <p>Organizations typically have visibility into only 60% of their APIs. The rest &mdash; shadow APIs, undocumented endpoints, forgotten services &mdash; represent a massive, invisible attack surface. Traditional approaches (code scanning, manual documentation, gateway logs) miss APIs that don't go through known ingress points.</p>
+
+  <div class="stats">
+    <div class="stat"><div class="value">40%</div><div class="label">APIs are unknown to security teams</div></div>
+    <div class="stat"><div class="value">0</div><div class="label">Code changes required</div></div>
+    <div class="stat"><div class="value">&lt;100m</div><div class="label">CPU overhead per node</div></div>
+    <div class="stat"><div class="value">42</div><div class="label">SSL libraries auto-discovered</div></div>
+  </div>
+
+  <div class="wow">
+    <div class="wow-tag">Highlight</div>
+    <h3>Invisible Deployment, Total Visibility</h3>
+    <p>The eBPF sniffer attaches to the kernel &mdash; not to your applications. Deploy a single DaemonSet and instantly gain visibility into every HTTPS API call on every node. No restarts, no config changes, no sidecars. Applications don't even know it's there.</p>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- ARCHITECTURE -->
+<!-- ============================================================ -->
+<section id="architecture">
+  <div class="section-label">End-to-End Pipeline</div>
+  <h2>Architecture</h2>
+  <p>Three components work together: a deliberately vulnerable platform generates realistic API traffic, the eBPF sniffer captures it at the kernel level, and the Reconstructor builds OpenAPI specifications from the observed traffic.</p>
+
+  <div class="arch">
+    <div class="arch-flow">
+      <div class="arch-node">
+        <div class="label">Target</div>
+        <div class="name">DVP</div>
+        <div class="detail">8 microservices<br>HTTPS on :8443</div>
+      </div>
+      <div class="arch-arrow">&rarr;</div>
+      <div class="arch-node">
+        <div class="label">Kernel</div>
+        <div class="name">OpenSSL</div>
+        <div class="detail">SSL_read / SSL_write<br>SSL_read_ex / SSL_write_ex</div>
+      </div>
+      <div class="arch-arrow glow">&rarr;</div>
+      <div class="arch-node highlight">
+        <div class="label">Capture</div>
+        <div class="name">eBPF Sniffer</div>
+        <div class="detail">uprobe interception<br>plaintext extraction</div>
+      </div>
+      <div class="arch-arrow glow">&rarr;</div>
+      <div class="arch-node highlight">
+        <div class="label">Correlate</div>
+        <div class="name">Correlator</div>
+        <div class="detail">PID+TID matching<br>req/resp pairing</div>
+      </div>
+      <div class="arch-arrow glow">&rarr;</div>
+      <div class="arch-node highlight">
+        <div class="label">Reconstruct</div>
+        <div class="name">Reconstructor</div>
+        <div class="detail">OpenAPI 3 spec<br>generation</div>
+      </div>
+      <div class="arch-arrow">&rarr;</div>
+      <div class="arch-node">
+        <div class="label">Discover</div>
+        <div class="name">Invicti Platform</div>
+        <div class="detail">API inventory<br>security scanning</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wow">
+    <div class="wow-tag">Highlight</div>
+    <h3>TLS Decryption Without TLS Termination</h3>
+    <p>Unlike proxies or sidecars that must terminate TLS to inspect traffic, the eBPF sniffer hooks into <code>SSL_read()</code> and <code>SSL_write()</code> at the library level. It reads the plaintext <strong>before encryption</strong> and <strong>after decryption</strong> &mdash; completely transparent to the application and the network. No certificates to manage, no MITM, no latency added to the request path.</p>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- DVP -->
+<!-- ============================================================ -->
+<section id="dvp">
+  <div class="section-label">Target Application</div>
+  <h2>Distributed Vulnerable Platform (DVP)</h2>
+  <p>A deliberately vulnerable SaaS platform consisting of 8 interconnected microservices. It simulates a realistic production environment with authentication, billing, payments, and inter-service communication &mdash; all running in Kubernetes via Helm.</p>
+
+  <div class="dvp-services">
+    <div class="dvp-svc"><strong>Gateway</strong><div class="port">:8443 (HTTPS)</div></div>
+    <div class="dvp-svc"><strong>Auth</strong><div class="port">:8001</div></div>
+    <div class="dvp-svc vuln"><strong>User</strong><div class="port">:8002</div><span class="vuln-tag">BOLA</span></div>
+    <div class="dvp-svc vuln"><strong>Project</strong><div class="port">:8003</div><span class="vuln-tag">BOLA</span></div>
+    <div class="dvp-svc vuln"><strong>Billing</strong><div class="port">:8004</div><span class="vuln-tag">BYPASS</span></div>
+    <div class="dvp-svc vuln"><strong>Payment</strong><div class="port">:8005</div><span class="vuln-tag">RACE</span></div>
+    <div class="dvp-svc"><strong>Notification</strong><div class="port">:8006</div></div>
+    <div class="dvp-svc"><strong>Reporting</strong><div class="port">:8007</div></div>
+  </div>
+
+  <h3>Intentional Vulnerability Categories</h3>
+  <div class="vuln-grid">
+    <div class="vuln-item"><span class="tag critical">Critical</span><h3>Broken Object-Level Authorization (BOLA)</h3><p>Any authenticated user can access any other user's data, projects, invoices, and payments by simply changing the ID in the URL.</p></div>
+    <div class="vuln-item"><span class="tag critical">Critical</span><h3>Broken Function-Level Authorization</h3><p>Admin-only operations (delete user, create coupon, approve refund) are callable by any authenticated user.</p></div>
+    <div class="vuln-item"><span class="tag high">High</span><h3>Workflow Bypass</h3><p>Invoices can be refunded without prior payment. Payment status transitions skip validation.</p></div>
+    <div class="vuln-item"><span class="tag high">High</span><h3>Race Conditions</h3><p>Concurrent payment requests are not deduplicated, allowing double-charging on the same invoice.</p></div>
+    <div class="vuln-item"><span class="tag medium">Medium</span><h3>Sensitive Data Exposure</h3><p>SSN, password hashes, full credit card numbers, and API tokens returned in API responses.</p></div>
+    <div class="vuln-item"><span class="tag medium">Medium</span><h3>Resource Amplification</h3><p>Fan-out notifications to all users from a single request. No rate limiting on report generation.</p></div>
+  </div>
+
+  <h3>Technology Stack</h3>
+  <pre><span class="code-comment"># Framework & Runtime</span>
+Python 3.12 + FastAPI + Uvicorn (HTTPS with self-signed TLS)
+
+<span class="code-comment"># Data Layer</span>
+PostgreSQL 16 (7 databases) + RabbitMQ 3 (async messaging)
+
+<span class="code-comment"># Auth</span>
+JWT (HS256, intentionally weak shared secret)
+
+<span class="code-comment"># Deployment</span>
+Kubernetes (K3s) via Helm chart, ConfigMap-based code injection
+8 microservices + 1 gateway + seed job (post-install hook)</pre>
+</section>
+
+<!-- ============================================================ -->
+<!-- EBPF SNIFFER -->
+<!-- ============================================================ -->
+<section id="ebpf">
+  <div class="section-label">Core Technology</div>
+  <h2>eBPF SSL/TLS Sniffer</h2>
+  <p>A kernel-level packet interception tool that captures plaintext HTTP from encrypted TLS connections. It uses eBPF uprobes to hook into SSL library functions at runtime &mdash; extracting request and response data before encryption and after decryption.</p>
+
+  <div class="cards">
+    <div class="card">
+      <div class="icon blue">&#x1F50D;</div>
+      <h3>Automatic Library Discovery</h3>
+      <p>Scans <code>/proc/*/maps</code> at startup to find every loaded SSL library across all running processes &mdash; including those inside containers. Discovers OpenSSL, GnuTLS, NSS, Go crypto/tls, and Rust rustls automatically.</p>
+    </div>
+    <div class="card">
+      <div class="icon purple">&#x2699;</div>
+      <h3>eBPF Uprobe Interception</h3>
+      <p>Attaches uprobes to <code>SSL_read</code>, <code>SSL_write</code>, <code>SSL_read_ex</code>, and <code>SSL_write_ex</code> functions. Captures the plaintext buffer content, return values, process metadata, and timing information.</p>
+    </div>
+    <div class="card">
+      <div class="icon green">&#x1F501;</div>
+      <h3>Request/Response Correlation</h3>
+      <p>Matches SSL write (request) and read (response) events from the same PID+TID into complete HTTP transactions. Supports both client-side and server-side capture perspectives.</p>
+    </div>
+    <div class="card">
+      <div class="icon cyan">&#x1F4E1;</div>
+      <h3>Telemetry Pipeline</h3>
+      <p>Correlated HTTP pairs are serialized into Reconstructor-compatible telemetry format and sent via HTTP POST with retry logic, exponential backoff, and circuit breaker protection.</p>
+    </div>
+    <div class="card">
+      <div class="icon orange">&#x1F6E1;</div>
+      <h3>Security &amp; Redaction</h3>
+      <p>Sensitive headers (Authorization, Cookie, API keys) are automatically redacted. PCI-DSS patterns in bodies are masked. Audit logging tracks all captured events.</p>
+    </div>
+    <div class="card">
+      <div class="icon red">&#x1F4CA;</div>
+      <h3>Observability</h3>
+      <p>Prometheus metrics on port 9090, health/readiness probes on port 8080. Tracks events captured, lost, latency, correlator state, and output circuit breaker status.</p>
+    </div>
+  </div>
+
+  <div class="wow">
+    <div class="wow-tag">Highlight</div>
+    <h3>42 SSL Libraries Discovered — Zero Configuration</h3>
+    <p>On a single K3s node running DVP, the sniffer automatically discovered and attached probes to <strong>42 SSL libraries</strong> across all running processes. This includes Python's OpenSSL bindings in every microservice container, the host system's libssl, Go's crypto/tls in CoreDNS and Traefik, and more. No configuration file lists these libraries &mdash; they are found dynamically by scanning <code>/proc</code>.</p>
+  </div>
+
+  <h3>How eBPF Uprobes Work</h3>
+  <pre><span class="code-comment">// 1. Application calls SSL_write() to send encrypted data</span>
+<span class="code-comment">// 2. eBPF uprobe fires BEFORE the function executes</span>
+<span class="code-comment">//    → captures: buffer pointer, process ID, thread ID, timestamp</span>
+
+<span class="code-keyword">int</span> <span class="code-func">probe_SSL_rw_enter</span>(struct pt_regs *ctx, void *ssl, void *buf, int num) {
+    u32 tid = bpf_get_current_pid_tgid();
+    bufs.update(&tid, &buf);          <span class="code-comment">// Store buffer pointer</span>
+    start_ns.update(&tid, &ts);       <span class="code-comment">// Store timestamp</span>
+    <span class="code-keyword">return</span> <span class="code-number">0</span>;
+}
+
+<span class="code-comment">// 3. SSL_write() executes normally (encrypts and sends)</span>
+<span class="code-comment">// 4. eBPF uretprobe fires AFTER the function returns</span>
+<span class="code-comment">//    → reads plaintext from stored buffer, emits event</span>
+
+<span class="code-keyword">static int</span> <span class="code-func">SSL_exit</span>(struct pt_regs *ctx, int rw) {
+    int len = PT_REGS_RC(ctx);        <span class="code-comment">// Bytes read/written</span>
+    bpf_probe_read_user(&data->buf, len, *bufp);  <span class="code-comment">// Copy plaintext</span>
+    perf_SSL_rw.perf_submit(ctx, data, size);      <span class="code-comment">// Emit to userspace</span>
+    <span class="code-keyword">return</span> <span class="code-number">0</span>;
+}</pre>
+
+  <div class="wow">
+    <div class="wow-tag">Highlight</div>
+    <h3>OpenSSL 3.x Extended Function Support</h3>
+    <p>Modern applications (Python 3.12+, Node.js) call <code>SSL_read_ex</code>/<code>SSL_write_ex</code> which return 1/0 (success/failure) instead of the byte count. The actual bytes are written to a 4th pointer parameter. The sniffer includes dedicated BPF handlers that dereference this pointer to extract the real byte count &mdash; a nuance that most eBPF SSL sniffers miss entirely.</p>
+  </div>
+
+  <h3>Deployment Specification</h3>
+  <pre><span class="code-comment"># DaemonSet — one sniffer pod per node</span>
+<span class="code-keyword">apiVersion:</span> apps/v1
+<span class="code-keyword">kind:</span> DaemonSet
+spec:
+  template:
+    spec:
+      <span class="code-keyword">hostPID:</span> <span class="code-number">true</span>          <span class="code-comment"># See all processes on the node</span>
+      <span class="code-keyword">hostNetwork:</span> <span class="code-number">true</span>      <span class="code-comment"># DNS for reconstructor endpoint</span>
+      containers:
+      - name: ebpf-sniffer
+        image: <span class="code-string">artifact.invicti.com:443/docker/invicti-ebpf-sniffer:latest</span>
+        securityContext:
+          <span class="code-keyword">privileged:</span> <span class="code-number">false</span>    <span class="code-comment"># NOT privileged</span>
+          capabilities:
+            add:
+            - BPF              <span class="code-comment"># Load BPF programs (kernel 5.8+)</span>
+            - PERFMON           <span class="code-comment"># Perf event access</span>
+            - SYS_PTRACE        <span class="code-comment"># Read /proc/*/maps</span>
+            - SYS_RESOURCE      <span class="code-comment"># Locked memory for BPF maps</span>
+            - DAC_READ_SEARCH   <span class="code-comment"># Read across containers</span>
+        env:
+        - name: SNIFFER_OUTPUT_TARGET
+          value: <span class="code-string">"reconstructor"</span>
+        - name: SNIFFER_RECONSTRUCTOR_ENDPOINT
+          value: <span class="code-string">"http://reconstructor-service/api/telemetry"</span>
+        resources:
+          requests: { cpu: <span class="code-number">100m</span>, memory: <span class="code-number">128Mi</span> }
+          limits:   { cpu: <span class="code-number">500m</span>, memory: <span class="code-number">512Mi</span> }</pre>
+</section>
+
+<!-- ============================================================ -->
+<!-- RECONSTRUCTOR -->
+<!-- ============================================================ -->
+<section id="reconstructor">
+  <div class="section-label">API Specification Engine</div>
+  <h2>Reconstructor</h2>
+  <p>The Reconstructor receives HTTP telemetry from the sniffer, analyzes request/response patterns, and automatically generates OpenAPI 3.0 specifications. These specs are uploaded to the Invicti Platform for API inventory and security scanning.</p>
+
+  <div class="cards">
+    <div class="card">
+      <div class="icon blue">&#x1F4E5;</div>
+      <h3>Telemetry Ingestion</h3>
+      <p>Accepts HTTP POST on <code>/api/telemetry</code>. 10-worker thread pool processes incoming events. Written in Go 1.23+ for low memory overhead.</p>
+    </div>
+    <div class="card">
+      <div class="icon purple">&#x1F4DD;</div>
+      <h3>OpenAPI Reconstruction</h3>
+      <p>Analyzes URL patterns, HTTP methods, request/response headers, body schemas, and status codes to reconstruct complete OpenAPI 3.0 specifications.</p>
+    </div>
+    <div class="card">
+      <div class="icon green">&#x2601;</div>
+      <h3>Platform Upload</h3>
+      <p>Reconstructed specs are uploaded to Invicti Platform via heartbeat mechanism. Specs are keyed by destination address (e.g., <code>10.42.0.3:8443</code>).</p>
+    </div>
+  </div>
+
+  <h3>Live Demo Output</h3>
+  <pre><span class="code-comment"># Sniffer captures and sends telemetry to Reconstructor</span>
+Telemetry sent: <span class="code-keyword">POST</span> <span class="code-string">/api/auth/login</span>      → <span class="code-number">200</span>  (total sent: 2)
+Telemetry sent: <span class="code-keyword">GET</span>  <span class="code-string">/api/users</span>            → <span class="code-number">200</span>  (total sent: 3)
+Telemetry sent: <span class="code-keyword">GET</span>  <span class="code-string">/api/projects</span>         → <span class="code-number">200</span>  (total sent: 4)
+Telemetry sent: <span class="code-keyword">GET</span>  <span class="code-string">/api/billing/invoices</span> → <span class="code-number">200</span>  (total sent: 5)
+Telemetry sent: <span class="code-keyword">GET</span>  <span class="code-string">/api/payments</span>         → <span class="code-number">200</span>  (total sent: 6)
+Telemetry sent: <span class="code-keyword">GET</span>  <span class="code-string">/api/payments/1</span>       → <span class="code-number">401</span>  (total sent: 7)
+
+<span class="code-comment"># Reconstructor builds and uploads OpenAPI specs</span>
+Sending reconstructed API spec: specKey=<span class="code-string">10.42.0.3:8443</span>
+Sending reconstructed API spec: specKey=<span class="code-string">10.46.3.249:30111</span></pre>
+
+  <div class="wow">
+    <div class="wow-tag">Highlight</div>
+    <h3>From Packet to OpenAPI Spec in Under 60 Seconds</h3>
+    <p>A user clicks a button in the DVP web UI. Within milliseconds, the eBPF sniffer captures the HTTPS request at the kernel level, extracts the plaintext HTTP, correlates it with the response, and sends it to the Reconstructor. Within 60 seconds, the Reconstructor has updated the OpenAPI specification and uploaded it to the Invicti Platform &mdash; where it appears as a discovered API endpoint ready for security scanning.</p>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- COMPARISON -->
+<!-- ============================================================ -->
+<section id="comparison">
+  <div class="section-label">Competitive Analysis</div>
+  <h2>How It Compares</h2>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Capability</th>
+          <th>eBPF Sniffer</th>
+          <th>Istio / Envoy</th>
+          <th>Kong Plugin</th>
+          <th>TAP (pcap)</th>
+          <th>NGINX Mirror</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="highlight-row">
+          <td>Captures TLS-encrypted traffic</td>
+          <td class="yes">Yes</td>
+          <td class="yes">Yes</td>
+          <td class="no">No (pre-TLS)</td>
+          <td class="no">No</td>
+          <td class="no">No (pre-TLS)</td>
+        </tr>
+        <tr class="highlight-row">
+          <td>Zero application changes</td>
+          <td class="yes">Yes</td>
+          <td class="no">Sidecar injection</td>
+          <td class="no">Plugin config</td>
+          <td class="yes">Yes</td>
+          <td class="no">Config change</td>
+        </tr>
+        <tr class="highlight-row">
+          <td>Go / Rust native TLS</td>
+          <td class="yes">Yes</td>
+          <td class="no">No</td>
+          <td class="no">No</td>
+          <td class="no">No</td>
+          <td class="no">No</td>
+        </tr>
+        <tr>
+          <td>HTTP/2 + gRPC</td>
+          <td class="yes">Yes</td>
+          <td class="yes">Yes</td>
+          <td class="partial">Partial</td>
+          <td class="no">No</td>
+          <td class="no">No</td>
+        </tr>
+        <tr>
+          <td>Works outside service mesh</td>
+          <td class="yes">Yes</td>
+          <td class="no">Requires Istio</td>
+          <td class="no">Requires Kong</td>
+          <td class="yes">Yes</td>
+          <td class="no">Requires NGINX</td>
+        </tr>
+        <tr>
+          <td>Captures inter-service traffic</td>
+          <td class="yes">Yes</td>
+          <td class="yes">Yes</td>
+          <td class="no">Gateway only</td>
+          <td class="yes">Yes</td>
+          <td class="no">Gateway only</td>
+        </tr>
+        <tr>
+          <td>Performance overhead</td>
+          <td class="yes">Minimal (~100m CPU)</td>
+          <td class="partial">High (sidecar per pod)</td>
+          <td class="partial">Medium</td>
+          <td class="yes">Low</td>
+          <td class="partial">Medium (mirroring)</td>
+        </tr>
+        <tr>
+          <td>Deployment model</td>
+          <td>DaemonSet (1/node)</td>
+          <td>Sidecar (1/pod)</td>
+          <td>Plugin (1/gateway)</td>
+          <td>DaemonSet (1/node)</td>
+          <td>Per NGINX instance</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="wow">
+    <div class="wow-tag">Highlight</div>
+    <h3>The Only Solution That Captures Go and Rust Native TLS</h3>
+    <p>Go and Rust applications use their own TLS implementations (<code>crypto/tls</code> and <code>rustls</code>) that bypass OpenSSL entirely. Istio, Kong, NGINX, and TAP solutions cannot see inside these connections. The eBPF sniffer discovers Go and Rust binaries by parsing their ELF symbols and attaches probes directly to their TLS read/write functions &mdash; capturing traffic that is completely invisible to every other approach.</p>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- DEMO STEPS -->
+<!-- ============================================================ -->
+<section id="demo">
+  <div class="section-label">Live Demo</div>
+  <h2>Demo Walkthrough</h2>
+
+  <div class="timeline">
+    <div class="timeline-item">
+      <div class="timeline-dot active">1</div>
+      <div class="timeline-content">
+        <h4>Show the Environment</h4>
+        <p><code>kubectl get pods -n dvp</code> &mdash; 8 microservices, eBPF sniffer, and Reconstructor all running in Kubernetes.</p>
+      </div>
+    </div>
+    <div class="timeline-item">
+      <div class="timeline-dot active">2</div>
+      <div class="timeline-content">
+        <h4>Show Probe Attachment</h4>
+        <p><code>kubectl logs ... | grep "Attached probes"</code> &mdash; 42 SSL libraries discovered and probed automatically, including Go's crypto/tls in Traefik and CoreDNS.</p>
+      </div>
+    </div>
+    <div class="timeline-item">
+      <div class="timeline-dot active">3</div>
+      <div class="timeline-content">
+        <h4>Generate Traffic from DVP UI</h4>
+        <p>Open the DVP web interface. Login, browse Users, Projects, Billing, Payments. Each click generates HTTPS API calls through the gateway.</p>
+      </div>
+    </div>
+    <div class="timeline-item">
+      <div class="timeline-dot active">4</div>
+      <div class="timeline-content">
+        <h4>Watch Live Capture</h4>
+        <p><code>kubectl logs ... | grep "Telemetry sent"</code> &mdash; see each API call captured in real-time: method, path, status code. Every HTTPS request is visible as plaintext.</p>
+      </div>
+    </div>
+    <div class="timeline-item">
+      <div class="timeline-dot active">5</div>
+      <div class="timeline-content">
+        <h4>Show Reconstructed API Specs</h4>
+        <p>Reconstructor logs show <code>"Sending reconstructed API spec"</code> &mdash; OpenAPI specifications are being built and uploaded to the Invicti Platform automatically.</p>
+      </div>
+    </div>
+    <div class="timeline-item">
+      <div class="timeline-dot active">6</div>
+      <div class="timeline-content">
+        <h4>View in Invicti Platform</h4>
+        <p>Open the Invicti Platform and show the discovered API endpoints, methods, and parameters &mdash; all generated automatically from observed traffic.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- TECHNICAL DEEP DIVE -->
+<!-- ============================================================ -->
+<section>
+  <div class="section-label">Technical Details</div>
+  <h2>Under the Hood</h2>
+
+  <div class="cards">
+    <div class="card">
+      <div class="icon blue">&#x1F9EC;</div>
+      <h3>BPF Program Compilation</h3>
+      <p>The eBPF C program is compiled at runtime by BCC with kernel-specific filters injected (PID, UID, comm, self-exclusion). Falls back from ring buffers to perf buffers on older kernels.</p>
+    </div>
+    <div class="card">
+      <div class="icon purple">&#x1F504;</div>
+      <h3>SSL_read_ex / SSL_write_ex</h3>
+      <p>OpenSSL 3.x extended functions use a 4th pointer parameter for byte count (return value is 1/0). Dedicated BPF handlers dereference this pointer via <code>bpf_probe_read_user</code>.</p>
+    </div>
+    <div class="card">
+      <div class="icon green">&#x1F500;</div>
+      <h3>Server-Side Correlation</h3>
+      <p>The correlator handles both perspectives: client-side (WRITE=request) and server-side (READ=request). Uses parsed HTTP content to determine role, not event direction.</p>
+    </div>
+    <div class="card">
+      <div class="icon cyan">&#x1F4E6;</div>
+      <h3>Per-CPU Lock-Free Buffers</h3>
+      <p><code>BPF_PERCPU_ARRAY</code> ensures zero contention between CPUs. Events flow through perf buffers (or ring buffers on 5.8+) without kernel locks.</p>
+    </div>
+    <div class="card">
+      <div class="icon orange">&#x1F310;</div>
+      <h3>Multi-Library Support</h3>
+      <p>Probes attach by inode, not PID. Once a <code>libssl.so</code> is probed, every process using that library is captured &mdash; including containers sharing the same base image layer.</p>
+    </div>
+    <div class="card">
+      <div class="icon red">&#x1F6A8;</div>
+      <h3>Protocol Detection</h3>
+      <p>Auto-detects HTTP/1.1, HTTP/2 (binary framing + HPACK), gRPC, and GraphQL. Non-HTTP protocols (database wire protocols, AMQP) are logged but not forwarded.</p>
+    </div>
+  </div>
+
+  <h3>Supported SSL/TLS Libraries</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Library</th><th>Language</th><th>Probed Functions</th><th>Discovery Method</th></tr></thead>
+      <tbody>
+        <tr><td>OpenSSL 1.x / 3.x</td><td>C</td><td>SSL_read, SSL_write, SSL_read_ex, SSL_write_ex, SSL_do_handshake</td><td>/proc/*/maps scan</td></tr>
+        <tr><td>GnuTLS</td><td>C</td><td>gnutls_record_send, gnutls_record_recv</td><td>/proc/*/maps scan</td></tr>
+        <tr><td>NSS (Mozilla)</td><td>C</td><td>PR_Read, PR_Write, PR_Send, PR_Recv</td><td>/proc/*/maps scan</td></tr>
+        <tr><td>Go crypto/tls</td><td>Go</td><td>(*Conn).Read, (*Conn).Write</td><td>ELF symbol parsing</td></tr>
+        <tr><td>Rust rustls</td><td>Rust</td><td>Custom TLS handlers</td><td>ELF symbol parsing</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Resource Footprint</h3>
+  <div class="stats">
+    <div class="stat"><div class="value">100m</div><div class="label">CPU request</div></div>
+    <div class="stat"><div class="value">128Mi</div><div class="label">Memory request</div></div>
+    <div class="stat"><div class="value">512Mi</div><div class="label">Memory limit (BCC compile spike)</div></div>
+    <div class="stat"><div class="value">1</div><div class="label">Pod per node (DaemonSet)</div></div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- FAQ -->
+<!-- ============================================================ -->
+<section id="faq">
+  <div class="section-label">Anticipated Questions</div>
+  <h2>Frequently Asked Questions</h2>
+  <p>The most likely questions from engineering, security, and leadership &mdash; with concise, defensible answers.</p>
+
+  <div class="faq-grid">
+
+    <!-- SECURITY & RISK -->
+    <div class="faq-category">
+      <div class="faq-cat-label red">Security &amp; Risk</div>
+
+      <div class="faq-item">
+        <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">
+          <span class="faq-arrow">&#x25B6;</span>
+          Does this require privileged containers? Isn't that a security risk?
+        </div>
+        <div class="faq-a">
+          <p><strong>No, it does NOT require privileged mode.</strong> On kernel 5.8+ (which covers all modern distributions), the sniffer runs with <code>privileged: false</code> and uses fine-grained Linux capabilities instead:</p>
+          <ul>
+            <li><code>CAP_BPF</code> &mdash; load BPF programs</li>
+            <li><code>CAP_PERFMON</code> &mdash; access perf events</li>
+            <li><code>CAP_SYS_PTRACE</code> &mdash; read <code>/proc/*/maps</code></li>
+            <li><code>CAP_DAC_READ_SEARCH</code> &mdash; read across container boundaries</li>
+          </ul>
+          <p>All other capabilities are explicitly dropped. The root filesystem is read-only. This follows the principle of least privilege &mdash; far less exposure than a privileged sidecar proxy.</p>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">
+          <span class="faq-arrow">&#x25B6;</span>
+          Can the sniffer read sensitive data like passwords and tokens?
+        </div>
+        <div class="faq-a">
+          <p><strong>It captures plaintext HTTP, but sensitive data is automatically redacted before it leaves the pod.</strong> The built-in redactor masks:</p>
+          <ul>
+            <li><code>Authorization</code>, <code>Cookie</code>, <code>Set-Cookie</code> headers</li>
+            <li>API keys, Bearer tokens, Basic auth credentials</li>
+            <li>PCI-DSS patterns (credit card numbers) in request/response bodies</li>
+          </ul>
+          <p>Additional headers can be added to the redaction list via configuration. The Reconstructor only needs URL patterns, methods, status codes, and header names &mdash; not the actual secret values.</p>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">
+          <span class="faq-arrow">&#x25B6;</span>
+          Where does captured data go? Does it leave our infrastructure?
+        </div>
+        <div class="faq-a">
+          <p>The data flow is:</p>
+          <ol>
+            <li><strong>Sniffer &rarr; Reconstructor</strong> &mdash; stays within your Kubernetes cluster (pod-to-pod HTTP)</li>
+            <li><strong>Reconstructor &rarr; Invicti Platform</strong> &mdash; only the reconstructed <em>OpenAPI specification</em> is uploaded, not raw traffic. The spec contains endpoint paths, methods, parameter names, and response schemas &mdash; no actual request/response payloads.</li>
+          </ol>
+          <p>For fully air-gapped environments, the Reconstructor can run in offline mode with specs exported locally.</p>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">
+          <span class="faq-arrow">&#x25B6;</span>
+          Could an attacker exploit the eBPF sniffer to intercept traffic?
+        </div>
+        <div class="faq-a">
+          <p>The sniffer is <strong>read-only</strong> &mdash; it observes traffic but cannot modify, inject, or redirect it. eBPF uprobes are a passive tracing mechanism. Additionally:</p>
+          <ul>
+            <li>The sniffer pod uses <code>readOnlyRootFilesystem: true</code></li>
+            <li>NetworkPolicy restricts egress to only DNS and the Reconstructor endpoint</li>
+            <li>RBAC grants only read access to node and pod metadata</li>
+            <li>Self-traffic is excluded (the sniffer's own PID is filtered at the BPF level)</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- PERFORMANCE & RELIABILITY -->
+    <div class="faq-category">
+      <div class="faq-cat-label blue">Performance &amp; Reliability</div>
+
+      <div class="faq-item">
+        <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">
+          <span class="faq-arrow">&#x25B6;</span>
+          What's the performance impact on production workloads?
+        </div>
+        <div class="faq-a">
+          <p><strong>Negligible.</strong> The eBPF program runs in kernel space with per-CPU lock-free buffers, so there's no contention or locking. Measured overhead:</p>
+          <ul>
+            <li><strong>CPU:</strong> ~100m (0.1 core) baseline, up to 500m under heavy load</li>
+            <li><strong>Memory:</strong> 128Mi steady state, up to 512Mi during BCC compilation at startup</li>
+            <li><strong>Latency added to requests:</strong> Zero. The uprobes execute asynchronously &mdash; the application doesn't wait for the sniffer.</li>
+          </ul>
+          <p>Compare this to Istio sidecars which add 2-10ms latency per request and ~100Mi memory per pod.</p>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">
+          <span class="faq-arrow">&#x25B6;</span>
+          What happens if the sniffer crashes? Does it affect applications?
+        </div>
+        <div class="faq-a">
+          <p><strong>Applications are completely unaffected.</strong> When the sniffer pod stops, the kernel automatically detaches all uprobes. There is no sidecar, no iptables rule, no proxy in the data path. Applications continue to operate normally with zero impact. When the sniffer restarts, it reattaches probes and resumes capturing.</p>
+          <p>A PodDisruptionBudget ensures at least one sniffer remains running during rolling updates.</p>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">
+          <span class="faq-arrow">&#x25B6;</span>
+          Can it handle high-throughput environments (10K+ requests/sec)?
+        </div>
+        <div class="faq-a">
+          <p>Yes. The architecture is designed for high throughput:</p>
+          <ul>
+            <li><strong>Per-CPU perf buffers</strong> &mdash; no cross-CPU locking, scales with core count</li>
+            <li><strong>Configurable buffer size</strong> &mdash; tune <code>perf_buffer_pages</code> for your traffic volume</li>
+            <li><strong>Port filtering</strong> &mdash; only capture traffic on ports you care about (e.g., 443, 8443)</li>
+            <li><strong>Process filtering</strong> &mdash; filter by PID, UID, or process name to reduce noise</li>
+          </ul>
+          <p>If the perf buffer overflows under extreme load, events are dropped (not queued) &mdash; the application is never backpressured. Lost events are tracked via the <code>sniffer_events_lost_total</code> Prometheus metric.</p>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">
+          <span class="faq-arrow">&#x25B6;</span>
+          What kernel versions are supported?
+        </div>
+        <div class="faq-a">
+          <div class="table-wrap" style="margin: 0.5rem 0;">
+            <table>
+              <thead><tr><th>Kernel</th><th>Support Level</th><th>Notes</th></tr></thead>
+              <tbody>
+                <tr><td>5.8+</td><td class="yes">Full</td><td>CAP_BPF + CAP_PERFMON (no privileged needed)</td></tr>
+                <tr><td>5.4 &ndash; 5.7</td><td class="yes">Full</td><td>Requires CAP_SYS_ADMIN (broader capability)</td></tr>
+                <tr><td>4.18 &ndash; 5.3</td><td class="partial">Partial</td><td>BCC backend only, no CO-RE support</td></tr>
+                <tr><td>&lt; 4.18</td><td class="no">Not supported</td><td>eBPF uprobe support insufficient</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>Tested on Ubuntu 20.04/22.04/24.04, Amazon Linux 2/2023, RHEL 8/9, and FIPS-enabled kernels (e.g., 5.15-aws-fips).</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEPLOYMENT & OPERATIONS -->
+    <div class="faq-category">
+      <div class="faq-cat-label green">Deployment &amp; Operations</div>
+
+      <div class="faq-item">
+        <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">
+          <span class="faq-arrow">&#x25B6;</span>
+          How long does it take to deploy?
+        </div>
+        <div class="faq-a">
+          <p><strong>Under 5 minutes.</strong> The entire deployment is three commands:</p>
+<pre style="margin: 0.5rem 0;">
+<span class="code-comment"># 1. Install Reconstructor (Helm chart)</span>
+helm install invicti-api-discovery oci://registry.invicti.com/invicti-api-discovery
+
+<span class="code-comment"># 2. Deploy sniffer (DaemonSet)</span>
+kubectl apply -f ebpf-sniffer.yaml
+
+<span class="code-comment"># 3. Verify</span>
+kubectl logs -l app.kubernetes.io/name=ebpf-sniffer | grep "Attached probes"
+</pre>
+          <p>No Helm values to customize for basic deployment. No application restarts needed. Probes attach within seconds of pod startup.</p>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">
+          <span class="faq-arrow">&#x25B6;</span>
+          Does it work with EKS, GKE, AKS, and managed Kubernetes?
+        </div>
+        <div class="faq-a">
+          <p><strong>Yes.</strong> It works on any Kubernetes distribution that runs Linux nodes with kernel 4.18+:</p>
+          <ul>
+            <li><strong>AWS EKS</strong> &mdash; tested on Amazon Linux 2 and Bottlerocket nodes</li>
+            <li><strong>GKE</strong> &mdash; works on Container-Optimized OS and Ubuntu nodes</li>
+            <li><strong>AKS</strong> &mdash; works on Ubuntu-based node pools</li>
+            <li><strong>K3s / RKE2</strong> &mdash; tested extensively (this demo runs on K3s)</li>
+            <li><strong>OpenShift</strong> &mdash; requires SCC (Security Context Constraints) allowing BPF capabilities</li>
+          </ul>
+          <p>The only requirement is that nodes run Linux and allow BPF program loading (most managed K8s providers permit this by default).</p>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">
+          <span class="faq-arrow">&#x25B6;</span>
+          How do we monitor the sniffer itself?
+        </div>
+        <div class="faq-a">
+          <p>Built-in observability on every pod:</p>
+          <ul>
+            <li><strong>Prometheus metrics</strong> (<code>:9090/metrics</code>) &mdash; events captured, events lost, latency histograms, probe count, correlator state, output circuit breaker status</li>
+            <li><strong>Health endpoint</strong> (<code>:8080/healthz</code>) &mdash; JSON with event counters, uptime, probe status</li>
+            <li><strong>Readiness probe</strong> (<code>:8080/readyz</code>) &mdash; returns 503 until BPF probes are attached</li>
+            <li><strong>Structured JSON logs</strong> &mdash; every telemetry send is logged with method, path, status code, and running total</li>
+          </ul>
+          <p>Key alert: <code>sniffer_events_lost_total &gt; 0</code> means the perf buffer overflowed &mdash; increase <code>perf_buffer_pages</code> or add port filters.</p>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">
+          <span class="faq-arrow">&#x25B6;</span>
+          What about new containers or services that start after the sniffer?
+        </div>
+        <div class="faq-a">
+          <p>The sniffer discovers SSL libraries by <strong>inode</strong>, not by PID. If a new container starts using the same base image (and therefore the same <code>libssl.so</code> inode), the existing probes automatically capture its traffic &mdash; no rescan needed.</p>
+          <p>For containers with a completely new SSL library (different image), the sniffer supports periodic rescanning via <code>SNIFFER_DISCOVERY_RESCAN_INTERVAL</code> (in seconds). Alternatively, restarting the sniffer pod triggers a full rescan in seconds.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- TECHNICAL EDGE CASES -->
+    <div class="faq-category">
+      <div class="faq-cat-label purple">Technical Edge Cases</div>
+
+      <div class="faq-item">
+        <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">
+          <span class="faq-arrow">&#x25B6;</span>
+          Does it capture internal service-to-service traffic (east-west)?
+        </div>
+        <div class="faq-a">
+          <p><strong>Only if that traffic is TLS-encrypted.</strong> The sniffer hooks into SSL library functions. If service-to-service communication uses plain HTTP (common inside a cluster), the sniffer won't see it because <code>SSL_read</code>/<code>SSL_write</code> are never called.</p>
+          <p>For capturing plain HTTP east-west traffic, use the <strong>TAP plugin</strong> (pcap-based) or <strong>Istio integration</strong> instead. The eBPF sniffer is specifically designed for TLS-encrypted traffic that other approaches can't see.</p>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">
+          <span class="faq-arrow">&#x25B6;</span>
+          What about mutual TLS (mTLS) and service mesh traffic?
+        </div>
+        <div class="faq-a">
+          <p><strong>Yes, mTLS is fully supported.</strong> mTLS uses the same SSL_read/SSL_write functions as regular TLS &mdash; the only difference is that both sides present certificates. The eBPF probes capture the plaintext regardless of whether it's one-way or mutual TLS.</p>
+          <p>For Istio mTLS specifically, we also offer the <strong>Envoy WASM integration</strong> which captures traffic at the proxy level. The eBPF sniffer can complement this by catching traffic from workloads that bypass the Envoy sidecar.</p>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">
+          <span class="faq-arrow">&#x25B6;</span>
+          Can it capture traffic from statically-linked binaries?
+        </div>
+        <div class="faq-a">
+          <p><strong>Yes, with some nuance:</strong></p>
+          <ul>
+            <li><strong>Go binaries</strong> &mdash; Go statically links <code>crypto/tls</code>. The sniffer discovers Go binaries by scanning <code>/proc</code> for known names (traefik, envoy, consul, etc.) and parsing their ELF symbols to find <code>(*Conn).Read</code>/<code>(*Conn).Write</code> offsets.</li>
+            <li><strong>Rust binaries</strong> &mdash; Same approach for <code>rustls</code>-based binaries.</li>
+            <li><strong>C/C++ static OpenSSL</strong> &mdash; If OpenSSL is statically compiled into a binary (rare but possible), the sniffer can attach via <code>--extra-lib openssl:/path/to/binary</code>.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">
+          <span class="faq-arrow">&#x25B6;</span>
+          How accurate is the reconstructed OpenAPI spec?
+        </div>
+        <div class="faq-a">
+          <p>The spec reflects <strong>what was actually observed in traffic</strong> &mdash; which is both its strength and limitation:</p>
+          <ul>
+            <li><strong>Strength:</strong> Every endpoint in the spec was genuinely called in production. No false positives from dead code or unused routes.</li>
+            <li><strong>Limitation:</strong> Endpoints that are never called during the observation period won't appear. Rare error paths or admin endpoints may be missing.</li>
+          </ul>
+          <p>For maximum coverage, run the sniffer for at least one full business cycle (typically 1-2 weeks) to capture seasonal and scheduled API patterns.</p>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">
+          <span class="faq-arrow">&#x25B6;</span>
+          Does it work with HTTP/2 and gRPC?
+        </div>
+        <div class="faq-a">
+          <p><strong>Yes.</strong> The protocol detector identifies HTTP/2 binary frames (magic prefix <code>PRI * HTTP/2.0</code> and frame headers). HPACK-compressed headers are decoded. gRPC (which runs over HTTP/2) is detected and parsed including the <code>:path</code>, <code>:method</code>, and <code>content-type: application/grpc</code> headers.</p>
+          <p>The correlator handles HTTP/2's multiplexed nature by accumulating response HEADERS and DATA frames before emitting a complete telemetry event.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- BUSINESS & STRATEGY -->
+    <div class="faq-category">
+      <div class="faq-cat-label orange">Business &amp; Strategy</div>
+
+      <div class="faq-item">
+        <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">
+          <span class="faq-arrow">&#x25B6;</span>
+          Why eBPF instead of improving our existing gateway-based approach?
+        </div>
+        <div class="faq-a">
+          <p>Gateway-based capture only sees traffic that flows through the gateway. It misses:</p>
+          <ul>
+            <li><strong>Service-to-service HTTPS calls</strong> that go directly between pods</li>
+            <li><strong>Background jobs and cron tasks</strong> that make API calls without going through ingress</li>
+            <li><strong>Third-party SDK calls</strong> to external APIs (Stripe, AWS, etc.)</li>
+            <li><strong>Services that bypass the gateway</strong> (debug endpoints, admin APIs, health checks)</li>
+          </ul>
+          <p>eBPF sees <em>everything</em> &mdash; it operates at the kernel level, below all application routing. The gateway approach and eBPF approach are complementary: gateways for traffic you control, eBPF for traffic you didn't know about.</p>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">
+          <span class="faq-arrow">&#x25B6;</span>
+          What's the competitive landscape? Who else does eBPF-based API discovery?
+        </div>
+        <div class="faq-a">
+          <p>The eBPF API discovery space is emerging:</p>
+          <ul>
+            <li><strong>Cilium/Hubble</strong> &mdash; focuses on network observability (L3/L4), not HTTP-level API discovery from encrypted traffic</li>
+            <li><strong>Pixie (New Relic)</strong> &mdash; eBPF-based observability but focused on APM, not API security or OpenAPI generation</li>
+            <li><strong>Akita Software (acquired by Postman)</strong> &mdash; traffic-based API spec generation but uses pcap, not eBPF uprobe interception of TLS</li>
+          </ul>
+          <p>Our differentiator: purpose-built for <strong>API security</strong> with native integration into the Invicti scanning platform. Discover an API &rarr; automatically scan it for OWASP API Top 10 vulnerabilities &mdash; closed loop.</p>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">
+          <span class="faq-arrow">&#x25B6;</span>
+          What's the roadmap?
+        </div>
+        <div class="faq-a">
+          <ul>
+            <li><strong>Auto-scan discovered APIs</strong> &mdash; trigger Invicti DAST scans automatically when new endpoints appear</li>
+            <li><strong>Drift detection</strong> &mdash; alert when production API behavior diverges from the documented OpenAPI spec</li>
+            <li><strong>eBPF CO-RE</strong> &mdash; pre-compiled BPF programs (no BCC dependency, faster startup, smaller image)</li>
+            <li><strong>Windows container support</strong> &mdash; eBPF is coming to Windows via the eBPF for Windows project</li>
+            <li><strong>Serverless/Lambda</strong> &mdash; lightweight agent for function-based compute</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<style>
+  /* FAQ Styles */
+  .faq-grid { display: flex; flex-direction: column; gap: 2rem; margin-top: 1.5rem; }
+  .faq-category { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+  .faq-cat-label { padding: 0.85rem 1.5rem; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; border-bottom: 1px solid var(--border); }
+  .faq-cat-label.red { background: rgba(239,68,68,0.06); color: var(--red); }
+  .faq-cat-label.blue { background: rgba(59,130,246,0.06); color: var(--accent); }
+  .faq-cat-label.green { background: rgba(34,197,94,0.06); color: var(--green); }
+  .faq-cat-label.purple { background: rgba(139,92,246,0.06); color: var(--accent2); }
+  .faq-cat-label.orange { background: rgba(245,158,11,0.06); color: var(--orange); }
+
+  .faq-item { border-bottom: 1px solid var(--border); }
+  .faq-item:last-child { border-bottom: none; }
+  .faq-q { padding: 1rem 1.5rem; cursor: pointer; font-weight: 600; font-size: 0.95rem; display: flex; align-items: flex-start; gap: 0.75rem; transition: background 0.15s; user-select: none; }
+  .faq-q:hover { background: rgba(255,255,255,0.02); }
+  .faq-arrow { color: var(--text-muted); font-size: 0.7rem; flex-shrink: 0; transition: transform 0.2s; margin-top: 4px; }
+  .faq-item.open .faq-arrow { transform: rotate(90deg); }
+  .faq-a { display: none; padding: 0 1.5rem 1.25rem 2.85rem; }
+  .faq-item.open .faq-a { display: block; }
+  .faq-a p { font-size: 0.9rem; color: var(--text-muted); margin-bottom: 0.75rem; }
+  .faq-a p:last-child { margin-bottom: 0; }
+  .faq-a ul, .faq-a ol { padding-left: 1.25rem; margin-bottom: 0.75rem; }
+  .faq-a li { font-size: 0.88rem; color: var(--text-muted); margin-bottom: 0.35rem; }
+  .faq-a strong { color: var(--text); }
+  .faq-a code { background: rgba(255,255,255,0.06); padding: 1px 6px; border-radius: 4px; font-size: 0.82rem; }
+</style>
+
+<footer>
+  <p>Invicti Security &mdash; eBPF API Discovery Demo &mdash; 2026</p>
+</footer>
+
+</body>
+</html>
